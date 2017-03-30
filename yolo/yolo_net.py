@@ -41,7 +41,7 @@ class YOLONet(object):
 
     def build_networks(self):
         if self.disp_console:
-            print "Building YOLO_small graph..."
+            print ("Building YOLO_small graph...")
         self.x = tf.placeholder('float32', [None, 448, 448, 3])
         self.conv_1 = self.conv_layer(1, self.x, 64, 7, 2)
         self.pool_2 = self.pooling_layer(2, self.conv_1, 2, 2)
@@ -82,7 +82,7 @@ class YOLONet(object):
             self.labels = tf.placeholder(
                 'float32', [None, self.cell_size, self.cell_size, 5 + self.num_class])
             self.loss = self.loss_layer(33, self.fc_32, self.labels)
-            tf.scalar_summary(self.phase + '/total_loss', self.loss)
+            tf.summary.scalar(self.phase + '/total_loss', self.loss)
         else:
             self.fc_32 = self.fc_layer(
                 32, self.fc_30, self.output_size, flat=False, linear=True)
@@ -105,14 +105,14 @@ class YOLONet(object):
         conv_biased = tf.add(conv, biases, name=str(idx) + '_conv_biased')
 
         if self.disp_console:
-            print '    Layer  %d : Type = Conv, Size = %d * %d, Stride = %d, Filters = %d, Input channels = %d' % (
-                idx, size, size, stride, filters, int(channels))
+            print ('    Layer  %d : Type = Conv, Size = %d * %d, Stride = %d, Filters = %d, Input channels = %d' % (
+                            idx, size, size, stride, filters, int(channels)))
         return tf.maximum(self.alpha * conv_biased, conv_biased, name=str(idx) + '_leaky_relu')
 
     def pooling_layer(self, idx, inputs, size, stride):
         if self.disp_console:
-            print '    Layer  %d : Type = Pool, Size = %d * %d, Stride = %d' % (
-                idx, size, size, stride)
+            print ('    Layer  %d : Type = Pool, Size = %d * %d, Stride = %d' % (
+                            idx, size, size, stride))
         return tf.nn.max_pool(inputs, ksize=[1, size, size, 1], strides=[1, stride, stride, 1], padding='SAME',
                               name=str(idx) + '_pool')
 
@@ -130,8 +130,8 @@ class YOLONet(object):
         self.collection.append(weight)
         self.collection.append(biases)
         if self.disp_console:
-            print '    Layer  %d : Type = Full, Hidden = %d, Input dimension = %d, Flat = %d, Activation = %d' % (
-                idx, hiddens, int(dim), int(flat), 1 - int(linear))
+            print ('    Layer  %d : Type = Full, Hidden = %d, Input dimension = %d, Flat = %d, Activation = %d' % (
+                            idx, hiddens, int(dim), int(flat), 1 - int(linear)))
         if linear:
             return tf.add(tf.matmul(inputs_processed, weight), biases, name=str(idx) + '_fc')
         ip = tf.add(tf.matmul(inputs_processed, weight), biases)
@@ -145,13 +145,13 @@ class YOLONet(object):
         Return:
           iou: 3-D tensor [CELL_SIZE, CELL_SIZE, BOXES_PER_CELL]
         """
-        boxes1 = tf.pack([boxes1[:, :, :, :, 0] - boxes1[:, :, :, :, 2] / 2.0,
+        boxes1 = tf.stack([boxes1[:, :, :, :, 0] - boxes1[:, :, :, :, 2] / 2.0,
                           boxes1[:, :, :, :, 1] - boxes1[:, :, :, :, 3] / 2.0,
                           boxes1[:, :, :, :, 0] + boxes1[:, :, :, :, 2] / 2.0,
                           boxes1[:, :, :, :, 1] + boxes1[:, :, :, :, 3] / 2.0])
         boxes1 = tf.transpose(boxes1, [1, 2, 3, 4, 0])
 
-        boxes2 = tf.pack([boxes2[:, :, :, :, 0] - boxes2[:, :, :, :, 2] / 2.0,
+        boxes2 = tf.stack([boxes2[:, :, :, :, 0] - boxes2[:, :, :, :, 2] / 2.0,
                           boxes2[:, :, :, :, 1] - boxes2[:, :, :, :, 3] / 2.0,
                           boxes2[:, :, :, :, 0] + boxes2[:, :, :, :, 2] / 2.0,
                           boxes2[:, :, :, :, 1] + boxes2[:, :, :, :, 3] / 2])
@@ -195,7 +195,7 @@ class YOLONet(object):
         offset = tf.reshape(offset,
             [1, self.cell_size, self.cell_size, self.boxes_per_cell])
         offset = tf.tile(offset, [self.batch_size, 1, 1, 1])
-        predict_boxes_tran = tf.pack([(predict_boxes[:, :, :, :, 0] + offset) / self.cell_size,
+        predict_boxes_tran = tf.stack([(predict_boxes[:, :, :, :, 0] + offset) / self.cell_size,
                                       (predict_boxes[:, :, :, :, 1] + tf.transpose(offset, (0, 2, 1, 3))) / self.cell_size,
                                       tf.square(predict_boxes[:, :, :, :, 2]),
                                       tf.square(predict_boxes[:, :, :, :, 3])])
@@ -211,7 +211,7 @@ class YOLONet(object):
         # calculate no_I tensor [CELL_SIZE, CELL_SIZE, BOXES_PER_CELL]
         noobject_mask = tf.ones_like(object_mask, dtype=tf.float32) - object_mask
 
-        boxes_tran = tf.pack([boxes[:, :, :, :, 0] * self.cell_size - offset,
+        boxes_tran = tf.stack([boxes[:, :, :, :, 0] * self.cell_size - offset,
                               boxes[:, :, :, :, 1] * self.cell_size - tf.transpose(offset, (0, 2, 1, 3)),
                               tf.sqrt(boxes[:, :, :, :, 2]),
                               tf.sqrt(boxes[:, :, :, :, 3])])
