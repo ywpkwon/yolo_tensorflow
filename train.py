@@ -40,15 +40,16 @@ class Solver(object):
             self.decay_rate, self.staircase, name='learning_rate')
         self.optimizer = tf.train.GradientDescentOptimizer(
             learning_rate=self.learning_rate).minimize(
-            self.net.loss, global_step=self.global_step)
+            self.net.total_loss, global_step=self.global_step)
         self.ema = tf.train.ExponentialMovingAverage(decay=0.9999)
         self.averages_op = self.ema.apply(tf.trainable_variables())
         with tf.control_dependencies([self.optimizer]):
             self.train_op = tf.group(self.averages_op)
 
-        gpu_options = tf.GPUOptions()
-        config = tf.ConfigProto(gpu_options=gpu_options)
-        self.sess = tf.Session(config=config)
+        # gpu_options = tf.GPUOptions()
+        # config = tf.ConfigProto(gpu_options=gpu_options)
+        # self.sess = tf.Session(config=config)
+        self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
 
         if self.weights_file is not None:
@@ -107,8 +108,8 @@ class Solver(object):
 
             if step % self.save_iter == 0:
                 print('{} Saving checkpoint file to: {}'.format(
-                    datetime.datetime.now().strftime('%m/%d %H:%M:%S')),
-                    self.output_dir)
+                    datetime.datetime.now().strftime('%m/%d %H:%M:%S'),
+                    self.output_dir))
                 self.saver.save(self.sess, self.ckpt_file,
                                 global_step=self.global_step)
 
@@ -147,7 +148,7 @@ def main():
     if args.data_dir != cfg.DATA_PATH:
         update_config_paths(args.data_dir, args.weights)
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = cfg.GPU
+    # os.environ['CUDA_VISIBLE_DEVICES'] = cfg.GPU
 
     yolo = YOLONet()
     pascal = pascal_voc('train')
