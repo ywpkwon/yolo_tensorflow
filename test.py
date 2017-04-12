@@ -2,10 +2,10 @@ import tensorflow as tf
 import numpy as np
 import os
 import cv2
+import argparse
 import yolo.config as cfg
 from yolo.yolo_net import YOLONet
 from utils.timer import Timer
-from utils.pascal_voc import pascal_voc
 
 
 class Detector(object):
@@ -60,7 +60,8 @@ class Detector(object):
         return result
 
     def detect_from_cvmat(self, inputs):
-        net_output = self.sess.run(self.net.fc_32, feed_dict={self.net.x: inputs})
+        net_output = self.sess.run(self.net.logits,
+                                   feed_dict={self.net.images: inputs})
         results = []
         for i in range(net_output.shape[0]):
             results.append(self.interpret_output(net_output[i]))
@@ -70,10 +71,11 @@ class Detector(object):
     def interpret_output(self, output):
         probs = np.zeros((self.cell_size, self.cell_size,
                           self.boxes_per_cell, self.num_class))
-        class_probs = np.reshape(output[0:self.boundary1], ( self.cell_size, self.cell_size, self.num_class))
+        class_probs = np.reshape(output[0:self.boundary1], (self.cell_size, self.cell_size, self.num_class))
         scales = np.reshape(output[self.boundary1:self.boundary2], (self.cell_size, self.cell_size, self.boxes_per_cell))
         boxes = np.reshape(output[self.boundary2:], (self.cell_size, self.cell_size, self.boxes_per_cell, 4))
-        offset = np.transpose(np.reshape(np.array([np.arange(self.cell_size)] * self.cell_size * self.boxes_per_cell), (self.boxes_per_cell, self.cell_size, self.cell_size)), (1, 2, 0))
+        offset = np.transpose(np.reshape(np.array([np.arange(self.cell_size)] * self.cell_size * self.boxes_per_cell),
+                                         [self.boxes_per_cell, self.cell_size, self.cell_size]), (1, 2, 0))
 
         boxes[:, :, :, 0] += offset
         boxes[:, :, :, 1] += np.transpose(offset, (1, 0, 2))
@@ -139,7 +141,7 @@ class Detector(object):
             detect_timer.tic()
             result = self.detect(frame)
             detect_timer.toc()
-            print ('Average detecting time: {:.3f}s'.format(detect_timer.average_time))
+            print('Average detecting time: {:.3f}s'.format(detect_timer.average_time))
 
             self.draw_result(frame, result)
             cv2.imshow('Camera', frame)
@@ -154,7 +156,7 @@ class Detector(object):
         detect_timer.tic()
         result = self.detect(image)
         detect_timer.toc()
-        print ('Average detecting time: {:.3f}s'.format(detect_timer.average_time))
+        print('Average detecting time: {:.3f}s'.format(detect_timer.average_time))
 
         self.draw_result(image, result)
         cv2.imshow('Image', image)
@@ -162,15 +164,22 @@ class Detector(object):
 
 
 def main():
-    os.environ['CUDA_VISIBLE_DEVICES'] = cfg.GPU
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--weights', default="YOLO_small.ckpt", type=str)
+    parser.add_argument('--weight_dir', default='weights', type=str)
+    parser.add_argument('--data_dir', default="data", type=str)
+    parser.add_argument('--gpu', default='', type=str)
+    args = parser.parse_args()
 
-    yolo = YOLONet('test')
-    weight_file = '/home/phantom/projects/yolo2/data/output/2017_03_30_16_36/save.ckpt-15000'
+    os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
+
+    yolo = YOLONet(False)
+    weight_file = os.path.join(args.data_dir, args.weight_dir, args.weights)
     detector = Detector(yolo, weight_file)
 
     # detect from camera
-    cap = cv2.VideoCapture(-1)
-    detector.camera_detector(cap)
+    # cap = cv2.VideoCapture(-1)
+    # detector.camera_detector(cap)
 
     # detect from image file
     imname = 'test/person.jpg'

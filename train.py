@@ -1,5 +1,4 @@
 import tensorflow as tf
-import numpy as np
 import datetime
 import os
 import argparse
@@ -22,18 +21,23 @@ class Solver(object):
         self.staircase = cfg.STAIRCASE
         self.summary_iter = cfg.SUMMARY_ITER
         self.save_iter = cfg.SAVE_ITER
-        self.output_dir = os.path.join(cfg.OUTPUT_DIR,
-            datetime.datetime.now().strftime('%Y_%m_%d_%H_%M'))
+        self.output_dir = os.path.join(
+            cfg.OUTPUT_DIR, datetime.datetime.now().strftime('%Y_%m_%d_%H_%M'))
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
         self.save_cfg()
 
-        self.global_step = tf.get_variable('global_step', [],
-            initializer=tf.constant_initializer(0), trainable=False)
+        self.variable_to_restore = tf.global_variables()
+        self.saver = tf.train.Saver(self.variable_to_restore, max_to_keep=None)
+        self.ckpt_file = os.path.join(self.output_dir, 'save.ckpt')
+        self.summary_op = tf.summary.merge_all()
+        self.writer = tf.summary.FileWriter(self.output_dir, flush_secs=60)
+
+        self.global_step = tf.get_variable(
+            'global_step', [], initializer=tf.constant_initializer(0), trainable=False)
         self.learning_rate = tf.train.exponential_decay(
             self.initial_learning_rate, self.global_step, self.decay_steps,
             self.decay_rate, self.staircase, name='learning_rate')
-        # self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(self.net.loss, global_step=self.global_step)
         self.optimizer = tf.train.GradientDescentOptimizer(
             learning_rate=self.learning_rate).minimize(
             self.net.loss, global_step=self.global_step)
@@ -42,16 +46,13 @@ class Solver(object):
         with tf.control_dependencies([self.optimizer]):
             self.train_op = tf.group(self.averages_op)
 
-        self.summary_op = tf.summary.merge_all()
-        self.saver = tf.train.Saver(self.net.collection, max_to_keep=None)
-        self.writer = tf.summary.FileWriter(self.output_dir, flush_secs=60)
-        self.ckpt_file = os.path.join(self.output_dir, 'save.ckpt')
-
-        self.sess = tf.Session()
+        gpu_options = tf.GPUOptions()
+        config = tf.ConfigProto(gpu_options=gpu_options)
+        self.sess = tf.Session(config=config)
         self.sess.run(tf.global_variables_initializer())
 
         if self.weights_file is not None:
-            print ('Restoring weights from: ' + self.weights_file)
+            print('Restoring weights from: ' + self.weights_file)
             self.saver.restore(self.sess, self.weights_file)
 
         self.writer.add_graph(self.sess.graph)
@@ -66,21 +67,16 @@ class Solver(object):
             load_timer.tic()
             images, labels = self.data.get()
             load_timer.toc()
-            feed_dict = {self.net.x: images, self.net.labels: labels}
+            feed_dict = {self.net.images: images, self.net.labels: labels}
 
             if step % self.summary_iter == 0:
                 if step % (self.summary_iter * 10) == 0:
-                    run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
-                    run_metadata = tf.RunMetadata()
 
                     train_timer.tic()
                     summary_str, loss, _ = self.sess.run(
-                        [self.summary_op, self.net.loss, self.train_op],
+                        [self.summary_op, self.net.total_loss, self.train_op],
                         feed_dict=feed_dict)
                     train_timer.toc()
-
-                    self.writer.add_run_metadata(run_metadata,
-                            'step_{}'.format(step), step)
 
                     log_str = ('{} Epoch: {}, Step: {}, Learning rate: {},'
                         ' Loss: {:5.3f}\nSpeed: {:.3f}s/iter,'
@@ -93,7 +89,7 @@ class Solver(object):
                         train_timer.average_time,
                         load_timer.average_time,
                         train_timer.remain(step, self.max_iter))
-                    print (log_str)
+                    print(log_str)
 
                 else:
                     train_timer.tic()
@@ -106,15 +102,15 @@ class Solver(object):
 
             else:
                 train_timer.tic()
-                _ = self.sess.run(self.train_op, feed_dict=feed_dict)
+                self.sess.run(self.train_op, feed_dict=feed_dict)
                 train_timer.toc()
 
             if step % self.save_iter == 0:
-                print ('{} Saving checkpoint file to: {}'.format(
-                            datetime.datetime.now().strftime('%m/%d %H:%M:%S'),
-                                self.output_dir))
+                print('{} Saving checkpoint file to: {}'.format(
+                    datetime.datetime.now().strftime('%m/%d %H:%M:%S')),
+                    self.output_dir)
                 self.saver.save(self.sess, self.ckpt_file,
-                    global_step=self.global_step)
+                                global_step=self.global_step)
 
     def save_cfg(self):
 
@@ -126,30 +122,41 @@ class Solver(object):
                     f.write(cfg_str)
 
 
-def main():
+def update_config_paths(data_dir, weights_file):
+    cfg.DATA_PATH = data_dir
+    cfg.PASCAL_PATH = os.path.join(data_dir, 'pascal_voc')
+    cfg.CACHE_PATH = os.path.join(cfg.PASCAL_PATH, 'cache')
+    cfg.OUTPUT_DIR = os.path.join(cfg.PASCAL_PATH, 'output')
+    cfg.WEIGHTS_DIR = os.path.join(cfg.PASCAL_PATH, 'weights')
 
+    cfg.WEIGHTS_FILE = os.path.join(cfg.WEIGHTS_DIR, weights_file)
+
+
+def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', default=None, type=str)
-    parser.add_argument('--gpu', default=None, type=int)
+    parser.add_argument('--weights', default="YOLO_small.ckpt", type=str)
+    parser.add_argument('--data_dir', default="data", type=str)
+    parser.add_argument('--threshold', default=0.2, type=float)
+    parser.add_argument('--iou_threshold', default=0.5, type=float)
+    parser.add_argument('--gpu', default='', type=str)
     args = parser.parse_args()
 
-    if args.weights is not None:
-        cfg.WEIGHTS_FILE = os.path.join(cfg.WEIGHTS_DIR, args.weights)
     if args.gpu is not None:
-        cfg.GPU = str(args.gpu)
-    else: cfg.GPU = '1'
+        cfg.GPU = args.gpu
 
-    # cfg.WEIGHTS_FILE = os.path.join(cfg.WEIGHTS_DIR, 'YOLO_small.ckpt')
-    # cfg.DISPLAY_ITER = 1
+    if args.data_dir != cfg.DATA_PATH:
+        update_config_paths(args.data_dir, args.weights)
 
     os.environ['CUDA_VISIBLE_DEVICES'] = cfg.GPU
 
-    yolo = YOLONet('train')
+    yolo = YOLONet()
     pascal = pascal_voc('train')
 
     solver = Solver(yolo, pascal)
 
+    print('Start training ...')
     solver.train()
+    print('Done training.')
 
 if __name__ == '__main__':
 
