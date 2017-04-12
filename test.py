@@ -27,7 +27,7 @@ class Detector(object):
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
 
-        print 'Restoring weights from: ' + self.weights_file
+        print ('Restoring weights from: ' + self.weights_file)
         self.saver = tf.train.Saver()
         self.saver.restore(self.sess, self.weights_file)
 
@@ -40,7 +40,7 @@ class Detector(object):
             cv2.rectangle(img, (x - w, y - h), (x + w, y + h), (0, 255, 0), 2)
             cv2.rectangle(img, (x - w, y - h - 20),
                           (x + w, y - h), (125, 125, 125), -1)
-            cv2.putText(img, result[i][0] + ' : %.2f' % result[i][5], (x - w + 5, y - h - 7), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.CV_AA)
+            cv2.putText(img, result[i][0] + ' : %.2f' % result[i][5], (x - w + 5, y - h - 7), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
 
     def detect(self, img):
         img_h, img_w, _ = img.shape
@@ -139,7 +139,7 @@ class Detector(object):
             detect_timer.tic()
             result = self.detect(frame)
             detect_timer.toc()
-            print 'Average detecting time: {:.3f}s'.format(detect_timer.average_time)
+            print ('Average detecting time: {:.3f}s'.format(detect_timer.average_time))
 
             self.draw_result(frame, result)
             cv2.imshow('Camera', frame)
@@ -154,7 +154,7 @@ class Detector(object):
         detect_timer.tic()
         result = self.detect(image)
         detect_timer.toc()
-        print 'Average detecting time: {:.3f}s'.format(detect_timer.average_time)
+        print ('Average detecting time: {:.3f}s'.format(detect_timer.average_time))
 
         self.draw_result(image, result)
         cv2.imshow('Image', image)
@@ -165,7 +165,7 @@ def main():
     os.environ['CUDA_VISIBLE_DEVICES'] = cfg.GPU
 
     yolo = YOLONet('test')
-    weight_file = 'data/weights/YOLO_small.ckpt'
+    weight_file = '/home/phantom/projects/yolo2/data/output/2017_03_30_16_36/save.ckpt-15000'
     detector = Detector(yolo, weight_file)
 
     # detect from camera

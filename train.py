@@ -137,9 +137,9 @@ def main():
         cfg.WEIGHTS_FILE = os.path.join(cfg.WEIGHTS_DIR, args.weights)
     if args.gpu is not None:
         cfg.GPU = str(args.gpu)
+    else: cfg.GPU = '1'
 
-    cfg.GPU = '1'
-    cfg.WEIGHTS_FILE = os.path.join(cfg.WEIGHTS_DIR, 'YOLO_small.ckpt')
+    # cfg.WEIGHTS_FILE = os.path.join(cfg.WEIGHTS_DIR, 'YOLO_small.ckpt')
     # cfg.DISPLAY_ITER = 1
 
     os.environ['CUDA_VISIBLE_DEVICES'] = cfg.GPU
