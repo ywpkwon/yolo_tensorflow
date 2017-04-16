@@ -62,6 +62,9 @@ class Detector(object):
     def detect_from_cvmat(self, inputs):
         net_output = self.sess.run(self.net.logits,
                                    feed_dict={self.net.images: inputs})
+
+        import pdb; pdb.set_trace()
+
         results = []
         for i in range(net_output.shape[0]):
             results.append(self.interpret_output(net_output[i]))

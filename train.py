@@ -55,6 +55,7 @@ class Solver(object):
         if self.weights_file is not None:
             print('Restoring weights from: ' + self.weights_file)
             self.saver.restore(self.sess, self.weights_file)
+            import pdb; pdb.set_trace
 
         self.writer.add_graph(self.sess.graph)
 
